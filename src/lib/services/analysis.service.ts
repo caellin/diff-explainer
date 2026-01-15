@@ -8,6 +8,7 @@ import type {
   AnalysisResponseDTO,
   StatusDTO,
   AIResponse,
+  DeleteAnalysesResponseDTO,
 } from "../../types";
 import { OpenRouterService, type AIGenerationError } from "./openrouter.service";
 
@@ -392,6 +393,34 @@ export class AnalysisService {
         created_at: updated.created_at,
         updated_at: updated.updated_at,
       },
+    };
+  }
+
+  /**
+   * Usuwa wiele analiz na podstawie listy ID.
+   *
+   * Proces:
+   * 1. Wykonuje batch DELETE z filtrem po ID
+   * 2. RLS automatycznie ogranicza do analiz użytkownika
+   * 3. Zwraca liczbę faktycznie usuniętych rekordów
+   *
+   * @param ids - Lista UUID analiz do usunięcia
+   * @returns Obiekt z liczbą usuniętych analiz
+   * @throws Error gdy operacja bazy danych się nie powiedzie
+   *
+   * @remarks
+   * - IDs które nie istnieją lub nie należą do użytkownika są ignorowane
+   * - Powiązane logi AI otrzymują analysis_id = NULL (trigger DB)
+   */
+  async deleteAnalyses(ids: string[]): Promise<DeleteAnalysesResponseDTO> {
+    const { data, error } = await this.supabase.from("pr_analyses").delete().in("id", ids).select("id");
+
+    if (error) {
+      throw new Error(`Failed to delete analyses: ${error.message}`);
+    }
+
+    return {
+      deleted_count: data?.length ?? 0,
     };
   }
 }

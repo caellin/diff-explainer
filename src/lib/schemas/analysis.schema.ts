@@ -3,6 +3,7 @@ import { z } from "zod";
 const MAX_DIFF_LINES = 1000;
 const MAX_BRANCH_NAME_LENGTH = 255;
 const MAX_TICKET_ID_LENGTH = 255;
+const MAX_DELETE_IDS = 100;
 
 /**
  * Liczy liczbę linii w stringu.
@@ -141,10 +142,29 @@ export const updateAnalysisSchema = z.object({
 export type UpdateAnalysisInput = z.infer<typeof updateAnalysisSchema>;
 
 /**
+ * Schemat walidacji dla usuwania analiz.
+ *
+ * Waliduje:
+ * - ids: niepusta tablica UUID, max 100 elementów
+ */
+export const deleteAnalysesSchema = z.object({
+  ids: z
+    .array(z.string().uuid("Each ID must be a valid UUID"))
+    .min(1, "At least one analysis ID is required")
+    .max(MAX_DELETE_IDS, `Cannot delete more than ${MAX_DELETE_IDS} analyses at once`),
+});
+
+/**
+ * Typ wejściowy dla usuwania analiz, wynikający ze schematu Zod.
+ */
+export type DeleteAnalysesInput = z.infer<typeof deleteAnalysesSchema>;
+
+/**
  * Eksportowane stałe dla testów i dokumentacji.
  */
 export const VALIDATION_LIMITS = {
   MAX_DIFF_LINES,
   MAX_BRANCH_NAME_LENGTH,
   MAX_TICKET_ID_LENGTH,
+  MAX_DELETE_IDS,
 } as const;

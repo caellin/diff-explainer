@@ -1,8 +1,13 @@
 import type { APIRoute } from "astro";
 
 import { AnalysisService } from "../../../lib/services/analysis.service";
-import { createAnalysisSchema } from "../../../lib/schemas/analysis.schema";
-import type { CreateAnalysisCommand, APIErrorResponse, ValidationErrorResponse } from "../../../types";
+import { createAnalysisSchema, deleteAnalysesSchema } from "../../../lib/schemas/analysis.schema";
+import type {
+  CreateAnalysisCommand,
+  DeleteAnalysesCommand,
+  APIErrorResponse,
+  ValidationErrorResponse,
+} from "../../../types";
 
 export const prerender = false;
 
@@ -72,6 +77,72 @@ export const POST: APIRoute = async ({ locals, request }) => {
 
     const { statusCode, message, details } = mapErrorToResponse(error);
     return createErrorResponse({ error: message, details, status_code: statusCode }, statusCode);
+  }
+};
+
+/**
+ * DELETE /api/analysis
+ *
+ * Trwale usuwa jedną lub więcej analiz PR.
+ *
+ * Wymaga autoryzacji: Bearer token w nagłówku Authorization.
+ *
+ * @returns 200 - Analizy usunięte pomyślnie
+ * @returns 400 - Błąd walidacji danych wejściowych
+ * @returns 401 - Brak autoryzacji
+ * @returns 500 - Błąd serwera
+ */
+export const DELETE: APIRoute = async ({ locals, request }) => {
+  try {
+    // 1. Sprawdź autoryzację
+    const user = locals.user;
+    if (!user) {
+      return createErrorResponse({ error: "Unauthorized", status_code: 401 }, 401);
+    }
+
+    // 2. Parsuj body żądania
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return createErrorResponse({ error: "Invalid JSON body", status_code: 400 }, 400);
+    }
+
+    // 3. Waliduj dane wejściowe
+    const validationResult = deleteAnalysesSchema.safeParse(body);
+    if (!validationResult.success) {
+      const fieldErrors: Record<string, string[]> = {};
+      for (const issue of validationResult.error.issues) {
+        const field = issue.path.join(".");
+        if (!fieldErrors[field]) {
+          fieldErrors[field] = [];
+        }
+        fieldErrors[field].push(issue.message);
+      }
+      return createValidationErrorResponse(fieldErrors);
+    }
+
+    // 4. Wywołaj serwis
+    const command: DeleteAnalysesCommand = validationResult.data;
+    const analysisService = new AnalysisService(locals.supabase, "");
+    const result = await analysisService.deleteAnalyses(command.ids);
+
+    // 5. Zwróć sukces
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("[DELETE /api/analysis] Error deleting analyses:", error);
+
+    return createErrorResponse(
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
+        status_code: 500,
+      },
+      500
+    );
   }
 };
 
