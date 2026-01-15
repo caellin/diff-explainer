@@ -103,6 +103,44 @@ export const uuidParamSchema = z.object({
 export type UUIDParam = z.infer<typeof uuidParamSchema>;
 
 /**
+ * Schemat walidacji dla odpowiedzi AI.
+ * Każde pole musi być niepustym stringiem (markdown).
+ */
+const aiResponseSchema = z.object({
+  summary: z.string({ required_error: "Summary is required" }).min(1, "Summary cannot be empty"),
+  risks: z.string({ required_error: "Risks is required" }).min(1, "Risks cannot be empty"),
+  tests: z.string({ required_error: "Tests is required" }).min(1, "Tests cannot be empty"),
+});
+
+/**
+ * Schemat walidacji dla aktualizacji analizy PR.
+ *
+ * Waliduje:
+ * - pr_name: niepusty string
+ * - ai_response: obiekt z summary, risks, tests
+ * - status_id: dodatnia liczba całkowita
+ * - ticket_id: opcjonalny, max 255 znaków
+ */
+export const updateAnalysisSchema = z.object({
+  pr_name: z.string({ required_error: "PR name is required" }).min(1, "PR name cannot be empty").trim(),
+  ai_response: aiResponseSchema,
+  status_id: z
+    .number({ required_error: "Status ID is required" })
+    .int("Status ID must be an integer")
+    .positive("Status ID must be positive"),
+  ticket_id: z
+    .string()
+    .max(MAX_TICKET_ID_LENGTH, `Ticket ID must be ${MAX_TICKET_ID_LENGTH} characters or less`)
+    .trim()
+    .optional(),
+});
+
+/**
+ * Typ wejściowy dla aktualizacji analizy, wynikający ze schematu Zod.
+ */
+export type UpdateAnalysisInput = z.infer<typeof updateAnalysisSchema>;
+
+/**
  * Eksportowane stałe dla testów i dokumentacji.
  */
 export const VALIDATION_LIMITS = {

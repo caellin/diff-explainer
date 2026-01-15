@@ -4,6 +4,8 @@ import type {
   CreateAnalysisCommand,
   CreateAnalysisResponseDTO,
   GenerateAnalysisResponseDTO,
+  UpdateAnalysisCommand,
+  AnalysisResponseDTO,
   StatusDTO,
   AIResponse,
 } from "../../types";
@@ -17,6 +19,17 @@ export class AnalysisNotFoundError extends Error {
   constructor(analysisId: string) {
     super(`Analysis not found: ${analysisId}`);
     this.name = "AnalysisNotFoundError";
+  }
+}
+
+/**
+ * Błąd rzucany gdy status_id nie istnieje w bazie.
+ * Używany przy aktualizacji analizy z nieprawidłowym statusem.
+ */
+export class InvalidStatusError extends Error {
+  constructor(statusId: number) {
+    super(`Invalid status_id: ${statusId}`);
+    this.name = "InvalidStatusError";
   }
 }
 
@@ -269,5 +282,67 @@ export class AnalysisService {
       // Nie przerywamy głównego przepływu - logowanie to operacja pomocnicza
       console.error("[AnalysisService] Failed to log AI request:", error);
     }
+  }
+
+  /**
+   * Aktualizuje istniejącą analizę PR.
+   *
+   * Proces:
+   * 1. Waliduje istnienie status_id w bazie
+   * 2. Aktualizuje rekord w pr_analyses
+   * 3. Pobiera zaktualizowany rekord z rozwiązanym statusem
+   * 4. Mapuje na DTO i zwraca
+   *
+   * @param analysisId - UUID analizy do aktualizacji
+   * @param command - Dane aktualizacji
+   * @returns Zaktualizowana analiza jako DTO
+   * @throws AnalysisNotFoundError gdy analiza nie istnieje lub nie należy do użytkownika
+   * @throws InvalidStatusError gdy status_id nie istnieje w bazie
+   */
+  async updateAnalysis(analysisId: string, command: UpdateAnalysisCommand): Promise<AnalysisResponseDTO> {
+    // 1. Waliduj status_id - sprawdź czy istnieje w bazie
+    const { data: status, error: statusError } = await this.supabase
+      .from("analysis_statuses")
+      .select("id, code")
+      .eq("id", command.status_id)
+      .single();
+
+    if (statusError || !status) {
+      throw new InvalidStatusError(command.status_id);
+    }
+
+    // 2. Aktualizuj rekord w pr_analyses
+    // RLS automatycznie sprawdza czy rekord należy do użytkownika
+    const { data: updated, error: updateError } = await this.supabase
+      .from("pr_analyses")
+      .update({
+        pr_name: command.pr_name,
+        ai_response: command.ai_response as unknown as Json,
+        status_id: command.status_id,
+        ticket_id: command.ticket_id ?? null,
+      })
+      .eq("id", analysisId)
+      .select("id, pr_name, branch_name, diff_content, ai_response, ticket_id, created_at, updated_at")
+      .single();
+
+    if (updateError || !updated) {
+      // RLS może zwrócić null jeśli rekord nie istnieje lub nie należy do użytkownika
+      throw new AnalysisNotFoundError(analysisId);
+    }
+
+    // 3. Mapuj na DTO i zwróć
+    return {
+      data: {
+        id: updated.id,
+        pr_name: updated.pr_name,
+        branch_name: updated.branch_name,
+        diff_content: updated.diff_content,
+        ai_response: updated.ai_response as unknown as AIResponse,
+        status: { id: status.id, code: status.code },
+        ticket_id: updated.ticket_id,
+        created_at: updated.created_at,
+        updated_at: updated.updated_at,
+      },
+    };
   }
 }
