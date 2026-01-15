@@ -285,6 +285,55 @@ export class AnalysisService {
   }
 
   /**
+   * Pobiera pojedynczą analizę po ID.
+   *
+   * Proces:
+   * 1. Pobiera analizę z bazy z JOIN na status
+   * 2. RLS automatycznie filtruje do user_id
+   * 3. Mapuje encję na DTO z rozwiązanym statusem
+   *
+   * @param analysisId - UUID analizy do pobrania
+   * @returns Analiza jako DTO z rozwiązanym statusem
+   * @throws AnalysisNotFoundError gdy analiza nie istnieje lub nie należy do użytkownika
+   */
+  async getAnalysisById(analysisId: string): Promise<AnalysisResponseDTO> {
+    // 1. Pobierz analizę z JOIN na status
+    const { data, error } = await this.supabase
+      .from("pr_analyses")
+      .select(
+        `
+        id, pr_name, branch_name, diff_content, ai_response, 
+        ticket_id, created_at, updated_at,
+        analysis_statuses!inner(id, code)
+      `
+      )
+      .eq("id", analysisId)
+      .single();
+
+    // 2. Obsłuż błędy - brak danych lub błąd zapytania
+    if (error || !data) {
+      throw new AnalysisNotFoundError(analysisId);
+    }
+
+    // 3. Mapuj na DTO
+    const status = data.analysis_statuses as { id: number; code: string };
+
+    return {
+      data: {
+        id: data.id,
+        pr_name: data.pr_name,
+        branch_name: data.branch_name,
+        diff_content: data.diff_content,
+        ai_response: data.ai_response as unknown as AIResponse,
+        status: { id: status.id, code: status.code },
+        ticket_id: data.ticket_id,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      },
+    };
+  }
+
+  /**
    * Aktualizuje istniejącą analizę PR.
    *
    * Proces:

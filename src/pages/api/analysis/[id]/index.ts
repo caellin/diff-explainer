@@ -7,6 +7,62 @@ import type { UpdateAnalysisCommand, APIErrorResponse, ValidationErrorResponse }
 export const prerender = false;
 
 /**
+ * GET /api/analysis/:id
+ *
+ * Pobiera pełne szczegóły konkretnej analizy PR.
+ *
+ * Wymaga autoryzacji: Bearer token w nagłówku Authorization.
+ * RLS automatycznie filtruje - użytkownik może pobierać tylko własne analizy.
+ *
+ * @returns 200 - Analiza pobrana pomyślnie
+ * @returns 400 - Nieprawidłowy format UUID
+ * @returns 401 - Brak autoryzacji
+ * @returns 404 - Analiza nie znaleziona
+ * @returns 500 - Błąd serwera
+ */
+export const GET: APIRoute = async ({ locals, params }) => {
+  try {
+    // 1. Sprawdź autoryzację
+    const user = locals.user;
+    if (!user) {
+      return createErrorResponse({ error: "Unauthorized", status_code: 401 }, 401);
+    }
+
+    // 2. Waliduj parametr :id (UUID)
+    const paramValidation = uuidParamSchema.safeParse(params);
+    if (!paramValidation.success) {
+      return createErrorResponse(
+        {
+          error: "Invalid analysis ID format",
+          details: paramValidation.error.issues[0]?.message,
+          status_code: 400,
+        },
+        400
+      );
+    }
+    const { id: analysisId } = paramValidation.data;
+
+    // 3. Pobierz analizę z serwisu
+    const analysisService = new AnalysisService(locals.supabase, "");
+    const result = await analysisService.getAnalysisById(analysisId);
+
+    // 4. Zwróć sukces
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("[GET /api/analysis/:id] Error fetching analysis:", error);
+
+    if (error instanceof AnalysisNotFoundError) {
+      return createErrorResponse({ error: "Analysis not found", status_code: 404 }, 404);
+    }
+
+    return createErrorResponse({ error: "Internal server error", status_code: 500 }, 500);
+  }
+};
+
+/**
  * PUT /api/analysis/:id
  *
  * Aktualizuje istniejącą analizę PR.
