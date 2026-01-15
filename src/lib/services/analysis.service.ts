@@ -1,7 +1,24 @@
 import type { Json } from "../../db/database.types";
 import type { SupabaseClientType } from "../../db/supabase.client";
-import type { CreateAnalysisCommand, CreateAnalysisResponseDTO, StatusDTO, AIResponse } from "../../types";
+import type {
+  CreateAnalysisCommand,
+  CreateAnalysisResponseDTO,
+  GenerateAnalysisResponseDTO,
+  StatusDTO,
+  AIResponse,
+} from "../../types";
 import { OpenRouterService, type AIGenerationError } from "./openrouter.service";
+
+/**
+ * Błąd rzucany gdy analiza nie została znaleziona.
+ * Może oznaczać, że analiza nie istnieje lub nie należy do użytkownika (RLS).
+ */
+export class AnalysisNotFoundError extends Error {
+  constructor(analysisId: string) {
+    super(`Analysis not found: ${analysisId}`);
+    this.name = "AnalysisNotFoundError";
+  }
+}
 
 /**
  * Stały status dla draftu analizy.
@@ -145,6 +162,87 @@ export class AnalysisService {
         ai_response: aiResponse,
         created_at: draft.created_at,
       },
+    };
+  }
+
+  /**
+   * Regeneruje opis AI dla istniejącej analizy.
+   *
+   * Proces:
+   * 1. Pobiera analizę z bazy danych
+   * 2. Wywołuje serwis AI z zapisanym diff_content
+   * 3. Loguje żądanie AI (sukces lub błąd)
+   * 4. Aktualizuje rekord z nową odpowiedzią AI
+   * 5. Zwraca wygenerowaną odpowiedź
+   *
+   * @param analysisId - UUID analizy do regeneracji
+   * @param userId - ID zalogowanego użytkownika
+   * @returns Odpowiedź AI z summary, risks, tests
+   * @throws AnalysisNotFoundError gdy analiza nie istnieje lub nie należy do użytkownika
+   * @throws Error gdy generowanie AI się nie powiedzie
+   */
+  async generateForExisting(analysisId: string, userId: string): Promise<GenerateAnalysisResponseDTO> {
+    // 1. Pobierz analizę z bazy
+    const { data: analysis, error: fetchError } = await this.supabase
+      .from("pr_analyses")
+      .select("id, diff_content, pr_name, branch_name, ticket_id")
+      .eq("id", analysisId)
+      .single();
+
+    if (fetchError || !analysis) {
+      throw new AnalysisNotFoundError(analysisId);
+    }
+
+    // 2. Generuj analizę przez AI
+    let aiResponse: AIResponse;
+    try {
+      const result = await this.openRouterService.generateAnalysis(
+        analysis.diff_content,
+        analysis.pr_name,
+        analysis.branch_name,
+        analysis.ticket_id ?? undefined
+      );
+
+      aiResponse = result.response;
+
+      // 3a. Loguj sukces
+      await this.logAIRequest({
+        analysisId: analysis.id,
+        userId,
+        model: result.model,
+        tokenUsage: result.tokenUsage,
+        statusCode: result.statusCode,
+        errorMessage: null,
+      });
+
+      // 4. Aktualizuj analizę
+      const { error: updateError } = await this.supabase
+        .from("pr_analyses")
+        .update({ ai_response: aiResponse as unknown as Json })
+        .eq("id", analysis.id);
+
+      if (updateError) {
+        console.error("[AnalysisService] Failed to update analysis with AI response:", updateError);
+      }
+    } catch (error) {
+      const aiError = error as AIGenerationError;
+
+      // 3b. Loguj błąd
+      await this.logAIRequest({
+        analysisId: analysis.id,
+        userId,
+        model: aiError.model || "unknown",
+        tokenUsage: aiError.tokenUsage || 0,
+        statusCode: aiError.statusCode || 500,
+        errorMessage: aiError.message,
+      });
+
+      throw new Error(`AI generation failed: ${aiError.message}`);
+    }
+
+    // 5. Zwróć odpowiedź
+    return {
+      data: aiResponse,
     };
   }
 

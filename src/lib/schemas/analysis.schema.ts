@@ -90,6 +90,19 @@ export const createAnalysisSchema = z.object({
 export type CreateAnalysisInput = z.infer<typeof createAnalysisSchema>;
 
 /**
+ * Schemat walidacji parametru UUID.
+ * Używany dla endpointów z parametrem :id w URL.
+ */
+export const uuidParamSchema = z.object({
+  id: z.string().uuid("Invalid analysis ID format - must be a valid UUID"),
+});
+
+/**
+ * Typ parametru UUID wynikający ze schematu Zod.
+ */
+export type UUIDParam = z.infer<typeof uuidParamSchema>;
+
+/**
  * Eksportowane stałe dla testów i dokumentacji.
  */
 export const VALIDATION_LIMITS = {
