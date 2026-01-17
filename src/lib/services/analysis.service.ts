@@ -9,6 +9,9 @@ import type {
   StatusDTO,
   AIResponse,
   DeleteAnalysesResponseDTO,
+  GetAnalysesQuery,
+  AnalysisListResponseDTO,
+  AnalysisListItemDTO,
 } from "../../types";
 import { OpenRouterService, type AIGenerationError } from "./openrouter.service";
 
@@ -421,6 +424,82 @@ export class AnalysisService {
 
     return {
       deleted_count: data?.length ?? 0,
+    };
+  }
+
+  /**
+   * Pobiera paginowaną listę analiz dla użytkownika.
+   *
+   * Proces:
+   * 1. Buduje zapytanie z dynamicznymi filtrami
+   * 2. Wykonuje COUNT i SELECT w jednym zapytaniu
+   * 3. Mapuje encje na uproszczone DTO
+   * 4. Zwraca listę z metadanymi paginacji
+   *
+   * @param query - Parametry zapytania (paginacja, filtry, sortowanie)
+   * @returns Paginowana lista analiz z metadanymi
+   * @throws Error gdy operacja bazy danych się nie powiedzie
+   *
+   * @remarks
+   * Parametr `search` implementuje unified search - przeszukuje jednocześnie
+   * pola pr_name i branch_name używając OR i ILIKE (case-insensitive).
+   */
+  async getAnalyses(query: GetAnalysesQuery): Promise<AnalysisListResponseDTO> {
+    const { page = 1, limit = 10, status_id, search, sort_field = "created_at", sort_order = "desc" } = query;
+    const offset = (page - 1) * limit;
+
+    // 1. Buduj bazowe zapytanie z JOIN na status
+    let dbQuery = this.supabase.from("pr_analyses").select(
+      `
+        id, pr_name, branch_name, created_at,
+        analysis_statuses!inner(id, code)
+      `,
+      { count: "exact" }
+    );
+
+    // 2. Dodaj opcjonalne filtry
+    if (status_id !== undefined) {
+      dbQuery = dbQuery.eq("status_id", status_id);
+    }
+
+    // 3. Unified search - przeszukuje pr_name i branch_name jednocześnie
+    if (search && search.trim().length > 0) {
+      const searchTerm = search.trim();
+      // OR condition: matches if search term appears in pr_name OR branch_name
+      // ILIKE = case-insensitive LIKE in PostgreSQL
+      dbQuery = dbQuery.or(`pr_name.ilike.%${searchTerm}%,branch_name.ilike.%${searchTerm}%`);
+    }
+
+    // 4. Sortowanie po wybranym polu i paginacja
+    dbQuery = dbQuery.order(sort_field, { ascending: sort_order === "asc" }).range(offset, offset + limit - 1);
+
+    // 5. Wykonaj zapytanie
+    const { data, count, error } = await dbQuery;
+
+    if (error) {
+      throw new Error(`Failed to fetch analyses: ${error.message}`);
+    }
+
+    // 6. Mapuj encje na DTO
+    const items: AnalysisListItemDTO[] = (data ?? []).map((row) => {
+      const status = row.analysis_statuses as { id: number; code: string };
+      return {
+        id: row.id,
+        pr_name: row.pr_name,
+        branch_name: row.branch_name,
+        status: { id: status.id, code: status.code },
+        created_at: row.created_at,
+      };
+    });
+
+    // 7. Zwróć odpowiedź z metadanymi
+    return {
+      data: items,
+      meta: {
+        total: count ?? 0,
+        page,
+        limit,
+      },
     };
   }
 }

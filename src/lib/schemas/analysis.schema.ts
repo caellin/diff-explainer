@@ -4,6 +4,8 @@ const MAX_DIFF_LINES = 1000;
 const MAX_BRANCH_NAME_LENGTH = 255;
 const MAX_TICKET_ID_LENGTH = 255;
 const MAX_DELETE_IDS = 100;
+const MAX_SEARCH_LENGTH = 255;
+const MAX_PAGE_LIMIT = 100;
 
 /**
  * Liczy liczbę linii w stringu.
@@ -160,6 +162,51 @@ export const deleteAnalysesSchema = z.object({
 export type DeleteAnalysesInput = z.infer<typeof deleteAnalysesSchema>;
 
 /**
+ * Dozwolone pola sortowania dla listy analiz.
+ * Odpowiadają kolumnom z indeksami w tabeli pr_analyses.
+ */
+export const ALLOWED_SORT_FIELDS = ["created_at", "pr_name", "branch_name"] as const;
+
+/**
+ * Typ pola sortowania wynikający z dozwolonych wartości.
+ */
+export type SortFieldSchema = (typeof ALLOWED_SORT_FIELDS)[number];
+
+/**
+ * Schemat walidacji dla parametrów zapytania listy analiz.
+ *
+ * Waliduje:
+ * - page: numer strony (min 1, domyślnie 1)
+ * - limit: liczba elementów na stronie (1-100, domyślnie 10)
+ * - status_id: opcjonalny filtr po ID statusu
+ * - search: unified search w pr_name i branch_name (max 255 znaków)
+ * - sort_field: pole sortowania (domyślnie 'created_at')
+ * - sort_order: kierunek sortowania (domyślnie 'desc')
+ */
+export const getAnalysesQuerySchema = z.object({
+  page: z.coerce.number().int("Page must be an integer").min(1, "Page must be at least 1").default(1),
+  limit: z.coerce
+    .number()
+    .int("Limit must be an integer")
+    .min(1, "Limit must be at least 1")
+    .max(MAX_PAGE_LIMIT, `Limit cannot exceed ${MAX_PAGE_LIMIT}`)
+    .default(10),
+  status_id: z.coerce.number().int("Status ID must be an integer").positive("Status ID must be positive").optional(),
+  search: z
+    .string()
+    .max(MAX_SEARCH_LENGTH, `Search query must be ${MAX_SEARCH_LENGTH} characters or less`)
+    .trim()
+    .optional(),
+  sort_field: z.enum(ALLOWED_SORT_FIELDS).default("created_at"),
+  sort_order: z.enum(["asc", "desc"]).default("desc"),
+});
+
+/**
+ * Typ wejściowy dla listy analiz, wynikający ze schematu Zod.
+ */
+export type GetAnalysesQueryInput = z.infer<typeof getAnalysesQuerySchema>;
+
+/**
  * Eksportowane stałe dla testów i dokumentacji.
  */
 export const VALIDATION_LIMITS = {
@@ -167,4 +214,6 @@ export const VALIDATION_LIMITS = {
   MAX_BRANCH_NAME_LENGTH,
   MAX_TICKET_ID_LENGTH,
   MAX_DELETE_IDS,
+  MAX_SEARCH_LENGTH,
+  MAX_PAGE_LIMIT,
 } as const;

@@ -243,6 +243,11 @@ export interface DeleteAnalysesCommand {
 export type SortDirection = "asc" | "desc";
 
 /**
+ * Dozwolone pola sortowania dla listy analiz.
+ */
+export type SortField = "created_at" | "pr_name" | "branch_name";
+
+/**
  * Parametry zapytania dla pobierania listy analiz.
  * Używane w GET /api/analysis/all.
  */
@@ -253,10 +258,12 @@ export interface GetAnalysesQuery {
   limit?: number;
   /** Filtrowanie po ID statusu */
   status_id?: StatusEntity["id"];
-  /** Wyszukiwanie w pr_name lub branch_name */
+  /** Unified search - przeszukuje pr_name i branch_name jednocześnie */
   search?: string;
-  /** Kierunek sortowania po dacie utworzenia (domyślnie 'desc') */
-  sort_by?: SortDirection;
+  /** Pole sortowania (domyślnie 'created_at') */
+  sort_field?: SortField;
+  /** Kierunek sortowania (domyślnie 'desc') */
+  sort_order?: SortDirection;
 }
 
 // ============================================================================
