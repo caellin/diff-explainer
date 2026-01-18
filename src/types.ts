@@ -216,6 +216,8 @@ export interface CreateAnalysisCommand {
 export interface UpdateAnalysisCommand {
   /** Nazwa pull requesta */
   pr_name: AnalysisEntity["pr_name"];
+  /** Nazwa brancha źródłowego */
+  branch_name: AnalysisEntity["branch_name"];
   /** Odpowiedź AI (możliwa edycja przez użytkownika) */
   ai_response: AIResponse;
   /** ID statusu (np. 2 = pending_review, 3 = completed) */
@@ -264,6 +266,109 @@ export interface GetAnalysesQuery {
   sort_field?: SortField;
   /** Kierunek sortowania (domyślnie 'desc') */
   sort_order?: SortDirection;
+}
+
+// ============================================================================
+// AUTH FORM TYPES
+// ============================================================================
+
+/**
+ * Dane formularza logowania.
+ */
+export interface LoginFormData {
+  /** Adres email użytkownika */
+  email: string;
+  /** Hasło użytkownika */
+  password: string;
+}
+
+/**
+ * Stan formularza logowania.
+ */
+export interface LoginFormState {
+  /** Czy trwa operacja logowania */
+  isLoading: boolean;
+  /** Ogólny błąd (np. z API Supabase) */
+  error: string | null;
+  /** Błędy walidacji per pole */
+  fieldErrors: {
+    email?: string;
+    password?: string;
+  };
+}
+
+// ============================================================================
+// HISTORY VIEW TYPES (ViewModel)
+// ============================================================================
+
+/**
+ * Stan filtrów wyszukiwania i statusu dla widoku historii.
+ */
+export interface HistoryFiltersState {
+  /** Wartość wyszukiwania */
+  search: string;
+  /** ID wybranego statusu (null = wszystkie) */
+  statusId: number | null;
+}
+
+/**
+ * Stan sortowania dla widoku historii.
+ */
+export interface HistorySortState {
+  /** Pole sortowania */
+  field: SortField;
+  /** Kierunek sortowania */
+  order: SortDirection;
+}
+
+/**
+ * Połączony stan zapytania dla hooka useHistoryData.
+ */
+export interface HistoryQueryState {
+  /** Numer aktualnej strony */
+  page: number;
+  /** Liczba elementów na stronie */
+  limit: number;
+  /** Stan filtrów */
+  filters: HistoryFiltersState;
+  /** Stan sortowania */
+  sort: HistorySortState;
+}
+
+/**
+ * Stan danych dla hooka useHistoryData.
+ */
+export interface HistoryDataState {
+  /** Lista analiz */
+  data: AnalysisListItemDTO[] | null;
+  /** Metadane paginacji */
+  meta: PaginationMeta | null;
+  /** Czy trwa ładowanie */
+  isLoading: boolean;
+  /** Komunikat błędu */
+  error: string | null;
+}
+
+/**
+ * Dozwolone wartości limitu na stronę.
+ */
+export type AllowedLimit = 10 | 20 | 50;
+
+/**
+ * Mapowanie kodu statusu na wariant Badge.
+ */
+export type StatusVariant = "secondary" | "warning" | "success";
+
+/**
+ * Stan usuwania analizy.
+ */
+export interface DeleteState {
+  /** Czy dialog jest otwarty */
+  isDialogOpen: boolean;
+  /** Analiza do usunięcia */
+  analysisToDelete: AnalysisListItemDTO | null;
+  /** Czy trwa usuwanie */
+  isDeleting: boolean;
 }
 
 // ============================================================================

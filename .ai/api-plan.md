@@ -74,19 +74,20 @@ This document outlines the REST API architecture for the PR/Diff Explainer appli
   - `500`: AI Error (logged).
 
 #### PUT `/api/analysis/:id`
-**Updates/Finalizes an analysis.** Used when the user edits the AI result or decides to "Save/Accept" the analysis.
+**Updates/Finalizes an analysis.** Used when the user edits the AI result, modifies metadata (pr_name, branch_name, ticket_id), or decides to "Save/Accept" the analysis.
 
 - **Request Body:**
   ```json
   {
     "pr_name": "string",
+    "branch_name": "string (max 255 chars)",
     "ai_response": {
       "summary": "string",
       "risks": "string",
       "tests": "string"
     },
     "status_id": 2,
-    "ticket_id": "string (optional)",
+    "ticket_id": "string (optional)"
   }
   ```
 - **Response Body (Success 200):** Updated object.
@@ -139,7 +140,8 @@ Retrieves a paginated list of saved analyses for the current user.
   - `limit`: number (default 10)
   - `status_id`: number (optional filter)
   - `search`: string (optional, searches `pr_name` or `branch_name`)
-  - `sort_by`: string (default 'desc')
+  - `sort_field`: string (default 'created_at', selects the field to sort by)
+  - `sort_order`: string (default 'desc')
 - **Response Body (Success 200):**
   ```json
   {

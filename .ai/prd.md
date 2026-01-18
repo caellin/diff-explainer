@@ -1,4 +1,4 @@
-# Dokument wymagań produktu (PRD) - PR/Diff Explainer
+# Dokument wymagań produktu (PRD) - Diff Explainer
 
 ## 1. Przegląd produktu
 

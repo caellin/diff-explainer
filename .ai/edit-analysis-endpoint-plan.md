@@ -30,6 +30,7 @@ Endpoint wymaga autoryzacji i dzięki Row Level Security (RLS) użytkownik może
 ```json
 {
   "pr_name": string,        // Wymagane - nazwa Pull Requesta
+  "branch_name": string,    // Wymagane - nazwa brancha źródłowego (max 255 znaków)
   "ai_response": {
     "summary": string,      // Wymagane - podsumowanie zmian (markdown)
     "risks": string,        // Wymagane - potencjalne ryzyka (markdown)
@@ -55,6 +56,7 @@ Endpoint wymaga autoryzacji i dzięki Row Level Security (RLS) użytkownik może
 // Command model (Request Body)
 interface UpdateAnalysisCommand {
   pr_name: AnalysisEntity["pr_name"];
+  branch_name: AnalysisEntity["branch_name"];
   ai_response: AIResponse;
   status_id: AnalysisEntity["status_id"];
   ticket_id?: NonNullable<AnalysisEntity["ticket_id"]>;
@@ -110,6 +112,12 @@ export const updateAnalysisSchema = z.object({
   pr_name: z
     .string({ required_error: "PR name is required" })
     .min(1, "PR name cannot be empty")
+    .trim(),
+  branch_name: z
+    .string({ required_error: "Branch name is required" })
+    .min(1, "Branch name cannot be empty")
+    .max(VALIDATION_LIMITS.MAX_BRANCH_NAME_LENGTH, 
+         `Branch name must be ${VALIDATION_LIMITS.MAX_BRANCH_NAME_LENGTH} characters or less`)
     .trim(),
   ai_response: aiResponseSchema,
   status_id: z
@@ -259,6 +267,7 @@ export type UpdateAnalysisInput = z.infer<typeof updateAnalysisSchema>;
 |------|-----------|-----|
 | `id` (URL) | UUID format | Zapobieganie SQL injection |
 | `pr_name` | Non-empty string | Wymagane pole |
+| `branch_name` | Non-empty string, max 255 chars | Wymagane pole |
 | `ai_response.*` | Non-empty strings | Kompletność danych |
 | `status_id` | Integer, exists in DB | Integralność danych |
 | `ticket_id` | Max 255 chars | Zgodność z DB schema |
@@ -320,6 +329,7 @@ const { data, error } = await supabase
   .from("pr_analyses")
   .update({
     pr_name: command.pr_name,
+    branch_name: command.branch_name,
     ai_response: command.ai_response,
     status_id: command.status_id,
     ticket_id: command.ticket_id ?? null,
@@ -600,6 +610,7 @@ Scenariusze do przetestowania:
      -H "Content-Type: application/json" \
      -d '{
        "pr_name": "Updated PR Name",
+       "branch_name": "feature/updated-branch",
        "ai_response": {
          "summary": "Updated summary",
          "risks": "Updated risks",

@@ -370,6 +370,7 @@ export class AnalysisService {
       .from("pr_analyses")
       .update({
         pr_name: command.pr_name,
+        branch_name: command.branch_name,
         ai_response: command.ai_response as unknown as Json,
         status_id: command.status_id,
         ticket_id: command.ticket_id ?? null,

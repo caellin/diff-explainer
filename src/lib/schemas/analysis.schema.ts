@@ -120,12 +120,18 @@ const aiResponseSchema = z.object({
  *
  * Waliduje:
  * - pr_name: niepusty string
+ * - branch_name: niepusty string, max 255 znaków
  * - ai_response: obiekt z summary, risks, tests
  * - status_id: dodatnia liczba całkowita
  * - ticket_id: opcjonalny, max 255 znaków
  */
 export const updateAnalysisSchema = z.object({
   pr_name: z.string({ required_error: "PR name is required" }).min(1, "PR name cannot be empty").trim(),
+  branch_name: z
+    .string({ required_error: "Branch name is required" })
+    .min(1, "Branch name cannot be empty")
+    .max(MAX_BRANCH_NAME_LENGTH, `Branch name must be ${MAX_BRANCH_NAME_LENGTH} characters or less`)
+    .trim(),
   ai_response: aiResponseSchema,
   status_id: z
     .number({ required_error: "Status ID is required" })

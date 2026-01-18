@@ -1,0 +1,29 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { Navbar } from "@/components/layout/Navbar";
+import { MobileMenu } from "@/components/layout/MobileMenu";
+import { AnalysisFormContainer } from "@/components/analysis/AnalysisFormContainer";
+
+export const prerender = false;
+---
+
+<Layout title="Nowa analiza | Diff Explainer">
+  <div class="relative flex min-h-screen flex-col">
+    <Navbar client:load />
+
+    <main class="flex-1">
+      <div class="container mx-auto px-4 py-6 max-w-4xl">
+        <header class="mb-6">
+          <h1 class="text-2xl font-bold tracking-tight">Nowa analiza</h1>
+          <p class="text-muted-foreground mt-1">
+            Wklej diff git, uzupełnij metadane i wygeneruj automatyczny opis zmian.
+          </p>
+        </header>
+
+        <AnalysisFormContainer client:load />
+      </div>
+    </main>
+
+    <MobileMenu client:load />
+  </div>
+</Layout>

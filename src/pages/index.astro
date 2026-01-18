@@ -1,8 +1,28 @@
 ---
-import Welcome from "../components/Welcome.astro";
 import Layout from "../layouts/Layout.astro";
+import { Navbar } from "@/components/layout/Navbar";
+import { MobileMenu } from "@/components/layout/MobileMenu";
+import { HistoryView } from "@/components/history/HistoryView";
+import type { StatusDTO } from "@/types";
+
+// Statyczne statusy - w produkcji mogłyby być pobierane z API
+const statuses: StatusDTO[] = [
+  { id: 1, code: "draft" },
+  { id: 2, code: "pending_review" },
+  { id: 3, code: "completed" },
+];
 ---
 
-<Layout>
-  <Welcome />
+<Layout title="Historia analiz | Diff Explainer">
+  <div class="relative flex min-h-screen flex-col">
+    <Navbar client:load />
+
+    <main class="flex-1">
+      <div class="container mx-auto px-4 py-6 max-w-6xl">
+        <HistoryView client:load initialStatuses={statuses} />
+      </div>
+    </main>
+
+    <MobileMenu client:load />
+  </div>
 </Layout>
